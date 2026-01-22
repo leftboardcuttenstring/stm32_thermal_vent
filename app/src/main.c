@@ -6,6 +6,18 @@
 UART_HandleTypeDef huart2;
 I2C_HandleTypeDef i2c;
 
+uint8_t* cmd;
+uint8_t cmd_tmp[3] = {0};
+
+bool set_temperature_cmd_flag = false;
+bool turn_off_cmd_flag = false;
+bool info_cmd_flag = false;
+bool data_incoming = false;
+
+extern uint8_t rx_byte;
+extern uint8_t rx_buffer[64];
+extern uint8_t rx_buffer_index;
+
 /*--Function headers for STM32-------------------------------------------------*/
 
 void SystemClock_Config(void);
@@ -15,18 +27,27 @@ void i2c_init(void);
 
 int main(void)
 {
-    HAL_Init();
-    SystemClock_Config();
-    MX_GPIO_Init();
-    MX_USART2_UART_Init();
-    i2c_init();
-
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
-
-    while (1)
-    {
-        
+  HAL_Init();
+  SystemClock_Config();
+  MX_GPIO_Init();
+  MX_USART2_UART_Init();
+  i2c_init();
+  
+  //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+  
+  while (1)
+  {
+    if (data_incoming == true) {
+      HAL_UART_Transmit_IT(&huart2, rx_buffer, 64);
     }
+  }
+}
+
+void find_cmd(uint8_t* msg) {
+  uint8_t cmd[3] = {0};
+  for(int i = 0; i < 3; i++) {
+    cmd_tmp[i] = msg[i];
+  }
 }
 
 void MX_USART2_UART_Init(void)

@@ -1,6 +1,13 @@
 #include "main.h"
 #include "stm32f4xx_it.h"
-#include "cmsis_armcc.h"
+#include <string.h>
+
+extern UART_HandleTypeDef huart2;
+
+uint8_t rx_byte = 0;
+uint8_t rx_buffer[64] = {0};
+uint8_t rx_buffer_index = 0;
+volatile uint8_t command_ready = 0;
 
 void NMI_Handler(void)
 {
@@ -34,7 +41,6 @@ void UsageFault_Handler(void)
 {
   while (1)
   {
-
   }
 }
 
@@ -55,12 +61,28 @@ void PendSV_Handler(void)
 
 void SysTick_Handler(void)
 {
-    HAL_IncTick();
+  HAL_IncTick();
 }
 
 void USART1_IRQHandler(void) {
-  if (USART1->SR & USART_SR_RXNE) {
-    uint8_t received_byte = (uint8_t)(USART1->DR);
-    process_data(received_byte);
+  HAL_UART_IRQHandler(&huart2);
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if(huart->Instance == USART2)
+  {
+    if (rx_buffer_index = 64 - 1) {
+      if (rx_byte == '\n' || rx_byte == '\r') {
+        rx_buffer[rx_buffer_index] = '\0';
+        command_ready = 1;
+      } else {
+        rx_buffer[rx_buffer_index++] = rx_byte;
+      }
+    } else {
+      rx_buffer_index = 0;
+    }
+    HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
+    data_incoming = true;
   }
 }
