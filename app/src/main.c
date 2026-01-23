@@ -17,6 +17,7 @@ bool data_incoming = false;
 extern uint8_t rx_byte;
 extern uint8_t rx_buffer[64];
 extern uint8_t rx_buffer_index;
+extern uint8_t command_ready;
 
 /*--Function headers for STM32-------------------------------------------------*/
 
@@ -33,12 +34,17 @@ int main(void)
   MX_USART2_UART_Init();
   i2c_init();
   
-  //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+  HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
   
   while (1)
   {
-    if (data_incoming == true) {
-      HAL_UART_Transmit_IT(&huart2, rx_buffer, 64);
+    if (command_ready == 1) {
+      HAL_UART_Transmit(&huart2, rx_buffer, strlen((char*)rx_buffer), 100);
+      HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, 10);
+
+      rx_buffer_index = 0;
+      memset(rx_buffer, 0, 64);
+      command_ready = 0;
     }
   }
 }
@@ -61,6 +67,8 @@ void MX_USART2_UART_Init(void)
   huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart2.Init.OverSampling = UART_OVERSAMPLING_16;
   HAL_UART_Init(&huart2);
+  HAL_NVIC_SetPriority(USART2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(USART2_IRQn);
 }
 
 void i2c_init(void)
@@ -106,10 +114,3 @@ void MX_GPIO_Init(void)
 void _init(void) {
 
 }
-
-
-
-
-
-
-
