@@ -6,13 +6,13 @@
 UART_HandleTypeDef huart2;
 I2C_HandleTypeDef i2c;
 
-uint8_t* cmd;
-uint8_t cmd_tmp[3] = {0};
+uint8_t cmd_tmp[4] = {0};
 
 bool set_temperature_cmd_flag = false;
 bool turn_off_cmd_flag = false;
 bool info_cmd_flag = false;
 bool data_incoming = false;
+uint16_t target_temperature = 0;
 
 extern uint8_t rx_byte;
 extern uint8_t rx_buffer[64];
@@ -35,24 +35,40 @@ int main(void)
   i2c_init();
   
   HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
-  
+
   while (1)
   {
     if (command_ready == 1) {
-      HAL_UART_Transmit(&huart2, rx_buffer, strlen((char*)rx_buffer), 100);
-      HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, 10);
+      /*HAL_UART_Transmit(&huart2, rx_buffer, strlen((char*)rx_buffer), 100);
+      HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, 10);*/
+
+      memcpy(cmd_tmp, rx_buffer, 3);
+      cmd_tmp[3] = '\0';
+      
+      /*HAL_UART_Transmit(&huart2, cmd_tmp, strlen((char*)cmd_tmp), 100);
+      HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, 10);*/
+
+      if (strcmp((const char *)cmd_tmp, (const char *)set_temperature_cmd) == 0) {
+        //HAL_UART_Transmit(&huart2, (const uint8_t *)"temperature changing\n", strlen((char*)"temperature changing\n"), 10);
+        int parsed_count = sscanf((char*)rx_buffer, "set %hu", &target_temperature);
+        if (parsed_count == 1) {
+          HAL_UART_Transmit(&huart2, (const uint8_t *)"setting is done\n", strlen((char*)"setting is done\n"), 10);
+          //setting, actually
+        } else {
+          HAL_UART_Transmit(&huart2, (const uint8_t *)"Unknown command\n", strlen((char*)"Unknown command\n"), 10);
+        }
+        //calling the function of changing the PWM filling
+      } else if (strcmp((const char *)cmd_tmp, (const char *)turn_off_cmd) == 0) {
+        HAL_UART_Transmit(&huart2, (const uint8_t *)"shutting down...\n", strlen((char*)"shutting down...\n"), 10);
+        //calling the function of disabling the PWM
+      } else {
+        HAL_UART_Transmit(&huart2, (const uint8_t *)"Unknown command\n", strlen((char*)"Unknown command\n"), 10);
+      }
 
       rx_buffer_index = 0;
       memset(rx_buffer, 0, 64);
       command_ready = 0;
     }
-  }
-}
-
-void find_cmd(uint8_t* msg) {
-  uint8_t cmd[3] = {0};
-  for(int i = 0; i < 3; i++) {
-    cmd_tmp[i] = msg[i];
   }
 }
 
@@ -83,7 +99,7 @@ void i2c_init(void)
   i2c.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   i2c.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
   if (HAL_I2C_Init(&i2c) == HAL_OK) {
-    HAL_UART_Transmit(&huart2, (const uint8_t *)"fine\n", strlen((char *)"fine\n"), HAL_MAX_DELAY);
+    //HAL_UART_Transmit(&huart2, (const uint8_t *)"fine\n", strlen((char *)"fine\n"), HAL_MAX_DELAY);
   }
 }
 
@@ -109,6 +125,15 @@ void MX_GPIO_Init(void)
     gpio.Pull = GPIO_NOPULL;
     gpio.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GPIOB, &gpio);
+}
+
+int set_pwm(uint8_t temp) {
+  if (temp > 80) {
+    return 1;
+  }
+  //calculating the pwm filling
+  //1 degree - 0.8 procent
+  return 0;
 }
 
 void _init(void) {
