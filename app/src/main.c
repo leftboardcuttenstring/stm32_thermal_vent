@@ -19,12 +19,16 @@ extern uint8_t rx_buffer[64];
 extern uint8_t rx_buffer_index;
 extern uint8_t command_ready;
 
+TIM_HandleTypeDef htim3;
+
 /*--Function headers for STM32-------------------------------------------------*/
 
 void SystemClock_Config(void);
 void MX_GPIO_Init(void);
 void MX_USART2_UART_Init(void);
 void i2c_init(void);
+
+void pwm_timer_init(void);
 
 int main(void)
 {
@@ -52,8 +56,9 @@ int main(void)
         //HAL_UART_Transmit(&huart2, (const uint8_t *)"temperature changing\n", strlen((char*)"temperature changing\n"), 10);
         int parsed_count = sscanf((char*)rx_buffer, "set %hu", &target_temperature);
         if (parsed_count == 1) {
-          HAL_UART_Transmit(&huart2, (const uint8_t *)"setting is done\n", strlen((char*)"setting is done\n"), 10);
+          //HAL_UART_Transmit(&huart2, (const uint8_t *)"setting is done\n", strlen((char*)"setting is done\n"), 10);
           //setting, actually
+          set_pwm(target_temperature);
         } else {
           HAL_UART_Transmit(&huart2, (const uint8_t *)"Unknown command\n", strlen((char*)"Unknown command\n"), 10);
         }
@@ -70,6 +75,37 @@ int main(void)
       command_ready = 0;
     }
   }
+}
+
+/**
+ * @brief function for init the TIM3 in
+ * mode of PWM
+ * 
+ */
+void pwm_timer_init(void) {
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  HAL_TIM_Base_Init(&htim3);
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig);
+  HAL_TIM_PWM_Init(&htim3);
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig);
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3);
+  HAL_TIM_MspPostInit(&htim3);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 }
 
 void MX_USART2_UART_Init(void)
@@ -105,34 +141,36 @@ void i2c_init(void)
 
 void MX_GPIO_Init(void)
 {
-    //PC7 - base/gate
-    //PB6 - collector
-    //PA7 - emitter
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
+  //PC7 - base/gate
+  //PB6 - collector
+  //PA7 - emitter
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
-    GPIO_InitTypeDef gpio = {0};
-    gpio.Pin = GPIO_PIN_7;
-    gpio.Mode = GPIO_MODE_OUTPUT_PP;
-    gpio.Pull = GPIO_NOPULL;
-    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOC, &gpio);
-    HAL_GPIO_Init(GPIOA, &gpio);
-    /* --- */
-    gpio.Pin = GPIO_PIN_6;
-    gpio.Mode = GPIO_MODE_OUTPUT_PP;
-    gpio.Pull = GPIO_NOPULL;
-    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOB, &gpio);
+  GPIO_InitTypeDef gpio = {0};
+  gpio.Pin = GPIO_PIN_7;
+  gpio.Mode = GPIO_MODE_OUTPUT_PP;
+  gpio.Pull = GPIO_NOPULL;
+  gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOC, &gpio);
+  HAL_GPIO_Init(GPIOA, &gpio);
+  /* --- */
+  gpio.Pin = GPIO_PIN_6;
+  gpio.Mode = GPIO_MODE_OUTPUT_PP;
+  gpio.Pull = GPIO_NOPULL;
+  gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &gpio);
 }
 
-int set_pwm(uint8_t temp) {
-  if (temp > 80) {
+int set_pwm(uint8_t filling) {
+  if (filling > 100) {
     return 1;
   }
-  //calculating the pwm filling
-  //1 degree - 0.8 procent
+  //this is PROCENTS of the max temperature
+  uint8_t resultivity_frequency = 65535 * (filling / 100);
+  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, resultivity_frequency);
   return 0;
 }
 

@@ -21,7 +21,7 @@ void MX_GPIO_Init(void);
 void Error_Handler(char* msg);
 void find_cmd(uint8_t* msg);
 
-int set_pwm(uint8_t temp);
+int set_pwm(uint8_t filling);
 
 extern bool set_temperature_cmd_flag;
 extern bool turn_off_cmd_flag;
